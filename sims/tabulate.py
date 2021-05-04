@@ -28,7 +28,7 @@ def wp_corrfunc(sample1, rp_bins, pi_max, sample2=None, randoms=None,
 
     elif do_auto:
         r = DDrppi(1, 2, pi_max, rp_bins, sample1[:, 0], sample1[:, 1],
-                   sample1[:, 2], periodic=True, boxsize=period,
+                   sample1[:, 2], periodic=True, boxsize=period[0],
                    xbin_refine_factor=1, ybin_refine_factor=1,
                    zbin_refine_factor=1, copy_particles=False)
         n_exp = (len(sample1) * len(sample1) / np.prod(period) * np.pi *
@@ -36,7 +36,7 @@ def wp_corrfunc(sample1, rp_bins, pi_max, sample2=None, randoms=None,
 
     elif do_cross:
         r = DDrppi(0, 2, pi_max, rp_bins, sample1[:, 0], sample1[:, 1],
-                   sample1[:, 2], periodic=True, boxsize=period,
+                   sample1[:, 2], periodic=True, boxsize=period[0],
                    X2=sample2[:, 0], Y2=sample2[:, 1], Z2=sample2[:, 2],
                    xbin_refine_factor=1, ybin_refine_factor=1,
                    zbin_refine_factor=1, copy_particles=False)
