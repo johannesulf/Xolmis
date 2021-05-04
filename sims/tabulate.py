@@ -10,7 +10,7 @@ from astropy import constants
 from colossus.cosmology.cosmology import setCosmology
 from colossus.halo import profile_nfw
 
-#from abacusnbody.data.compaso_halo_catalog import CompaSOHaloCatalog
+from abacusnbody.data.compaso_halo_catalog import CompaSOHaloCatalog
 
 from halotools.sim_manager import UserSuppliedHaloCatalog
 from halotools.empirical_models import delta_vir
@@ -98,7 +98,7 @@ def read_abacus_summit_catalog(simulation, redshift):
     halocat.halos['x_com'] += halocat.header['BoxSize'] / 2.0
     halocat.halos['SO_mass'] = (halocat.halos['N'] *
                                 halocat.header['ParticleMassHMsun'])
-    halocat.halos = halocat.halos[halocat.halos['SO_mass'] > 1e11]
+    halocat.halos = halocat.halos[halocat.halos['N'] > 300]
 
     dvir = delta_vir(cosmology, redshift) * 200 / (18 * np.pi**2)
     rho_crit = (cosmology.critical_density(redshift) /
