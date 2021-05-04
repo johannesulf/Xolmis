@@ -172,7 +172,8 @@ def main():
     halotab = TabCorr.tabulate(
         halocat, wp_corrfunc, rp_bins, pi_max=40,
         cens_prof_model=cens_prof_model, sats_prof_model=sats_prof_model,
-        verbose=True, num_threads=34, sats_per_prim_haloprop=1e-12,
+        verbose=True, num_threads=34,
+        sats_per_prim_haloprop=1e-12 if halocat.Lox[0] <= 1000 else 1e-13,
         project_xyz=True)
 
     halotab.write(os.path.join(path, 'wp.hdf5'), overwrite=True)
