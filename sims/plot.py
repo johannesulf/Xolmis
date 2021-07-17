@@ -21,7 +21,8 @@ def main():
     halotab = TabCorr.read(os.path.join(path, 'wp.hdf5'))
 
     model = PrebuiltHodModelFactory(
-        'zheng07', threshold=-18, redshift=args.redshift)
+        'zheng07', threshold=-18, redshift=args.redshift,
+        modulate_with_cenocc=True)
     rp_ave = 0.5 * (halotab.tpcf_args[0][1:] + halotab.tpcf_args[0][:-1])
 
     ngal, wp = halotab.predict(model)
