@@ -3,3 +3,6 @@ __pycache__
 sims/*
 !sims/tabulate.py
 !sims/plot.py
+*.hdf5
+*.h5
+
