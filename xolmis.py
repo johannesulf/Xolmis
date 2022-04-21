@@ -68,7 +68,7 @@ def s_mu_tpcf_corrfunc(sample1, s_bins, mu_bins, sample2=None, randoms=None,
 
 
 def simulation_directory(simulation, redshift):
-    return os.path.join(BASE_DIR, 'sims', simulation, 'z{:.3f}'.format(
+    return os.path.join(BASE_DIR, 'sims', simulation, '{:.1f}'.format(
         redshift).replace('.', 'p'))
 
 
