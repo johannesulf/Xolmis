@@ -40,7 +40,7 @@ gumbo = gumbo[gumbo['tng_lgssfr'] < ssfr_cut(np.log10(gumbo['um_sm']))]
 
 # %%
 
-ngal_cut_list = [5e-4, 5e-3]
+ngal_cut_list = [5e-4, 2.5e-3]
 name_list = ['desi-1', 'desi-2']
 
 cosmology = Planck15.clone(H0=100)
@@ -58,12 +58,12 @@ for ngal_cut, name in zip(ngal_cut_list, name_list):
     select = gumbo['um_sm'] > mstar_cut
     pos = return_xyz_formatted_array(
         gumbo['galaxy_x'], gumbo['galaxy_y'], gumbo['galaxy_z'],
-        velocity=gumbo['galaxy_vz'] * 0, velocity_distortion_dimension='z',
+        velocity=gumbo['galaxy_vz'], velocity_distortion_dimension='z',
         redshift=redshift, cosmology=cosmology, period=period)[select]
     pos[:, 0] = enforce_periodicity_of_box(pos[:, 0], period)
     pos[:, 1] = enforce_periodicity_of_box(pos[:, 1], period)
 
-    xi = xolmis.s_mu_tpcf(
+    xi = xolmis.s_mu_tpcf_corrfunc(
         pos, xolmis.S_BINS['DESI-2'], xolmis.MU_BINS['DESI-2'],
         period=period)
     n_jk = 20
@@ -78,7 +78,7 @@ for ngal_cut, name in zip(ngal_cut_list, name_list):
                   (pos[:, 0] >= period / n_jk * (i_x + 1)) |
                   (pos[:, 1] < period / n_jk * i_y) |
                   (pos[:, 1] >= period / n_jk * (i_y + 1)))
-        xi = xolmis.s_mu_tpcf(
+        xi = xolmis.s_mu_tpcf_corrfunc(
             pos[select], xolmis.S_BINS['DESI-2'],
             xolmis.MU_BINS['DESI-2'], period=period)
         i = i_x * n_jk + i_y

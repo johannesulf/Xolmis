@@ -1,131 +1,26 @@
 import os
+import copy
+import xolmis
 import argparse
 import numpy as np
-
-from astropy.cosmology import w0waCDM
-from astropy import units as u
-
-from abacusnbody.data.compaso_halo_catalog import CompaSOHaloCatalog
-
-from halotools.sim_manager import UserSuppliedHaloCatalog
-from halotools.empirical_models import delta_vir
-from halotools.empirical_models import TrivialPhaseSpace, NFWPhaseSpace
-from Corrfunc.theory import DDrppi, DDsmu
-
+import multiprocessing
 from tabcorr import TabCorr
+from halotools.empirical_models import TrivialPhaseSpace, NFWPhaseSpace
+from halotools.mock_observables import s_mu_tpcf, tpcf_multipole
 
 
-def wp_corrfunc(sample1, rp_bins, pi_max, sample2=None, randoms=None,
-                period=None, do_auto=True, do_cross=True):
+def tabcorr_s_mu_to_multipole(halotab_s_mu, mu_bins, order):
+    halotab_mult = copy.deepcopy(halotab_s_mu)
+    halotab_mult.tpcf_shape = (halotab_s_mu.tpcf_shape[0], )
+    halotab_mult.tpcf_matrix = np.zeros(
+        (halotab_s_mu.tpcf_shape[0], halotab_s_mu.tpcf_matrix.shape[1]))
 
-    if (do_auto and do_cross) or (not do_auto and not do_cross):
-        raise RuntimeError('Not implemented!')
+    for i in range(halotab_s_mu.tpcf_matrix.shape[1]):
+        halotab_mult.tpcf_matrix[:, i] = tpcf_multipole(
+            halotab_s_mu.tpcf_matrix[:, i].reshape(
+                halotab_s_mu.tpcf_shape), mu_bins, order=order)
 
-    elif do_auto:
-        r = DDrppi(1, 2, pi_max, rp_bins, sample1[:, 0], sample1[:, 1],
-                   sample1[:, 2], periodic=True, boxsize=period[0],
-                   xbin_refine_factor=1, ybin_refine_factor=1,
-                   zbin_refine_factor=1, copy_particles=False)
-        n_exp = (len(sample1) * len(sample1) / np.prod(period) * np.pi *
-                 np.diff(rp_bins**2) * 2 * pi_max)
-
-    elif do_cross:
-        r = DDrppi(0, 2, pi_max, rp_bins, sample1[:, 0], sample1[:, 1],
-                   sample1[:, 2], periodic=True, boxsize=period[0],
-                   X2=sample2[:, 0], Y2=sample2[:, 1], Z2=sample2[:, 2],
-                   xbin_refine_factor=1, ybin_refine_factor=1,
-                   zbin_refine_factor=1, copy_particles=False)
-        n_exp = (len(sample1) * len(sample2) / np.prod(period) * np.pi *
-                 np.diff(rp_bins**2) * 2 * pi_max)
-
-    npairs = r['npairs']
-    npairs = np.array([np.sum(n) for n in np.split(npairs, len(rp_bins) - 1)])
-
-    return (npairs / n_exp - 1) * 2 * pi_max
-
-
-def s_mu_tpcf_corrfunc(sample1, s_bins, mu_bins, sample2=None, randoms=None,
-                       period=None, do_auto=True, do_cross=True):
-
-    print(np.amin(sample1, axis=0), np.amax(sample1, axis=0))
-    if do_cross:
-        print(np.amin(sample2, axis=0), np.amax(sample2, axis=0))
-
-    if (do_auto and do_cross) or (not do_auto and not do_cross):
-        raise RuntimeError('Not implemented!')
-
-    elif do_auto:
-        r = DDsmu(1, 1, s_bins, 1, len(mu_bins) - 1, sample1[:, 0],
-                  sample1[:, 1], sample1[:, 2], periodic=True,
-                  boxsize=period[0], xbin_refine_factor=1,
-                  ybin_refine_factor=1, zbin_refine_factor=1, verbose=True)
-        n_exp = (len(sample1) * len(sample1) / np.prod(period) * 4 *
-                 np.pi / 3 * np.diff(s_bins**3) / (len(mu_bins) - 1))
-
-    elif do_cross:
-        r = DDsmu(0, 1, s_bins, 1, len(mu_bins) - 1, sample1[:, 0],
-                  sample1[:, 1], sample1[:, 2], periodic=True,
-                  boxsize=period[0], X2=sample2[:, 0],
-                  Y2=sample2[:, 1], Z2=sample2[:, 2], xbin_refine_factor=1,
-                  ybin_refine_factor=1, zbin_refine_factor=1)
-        n_exp = (len(sample1) * len(sample2) / np.prod(period) * 4 *
-                 np.pi / 3 * np.diff(s_bins**3) / (len(mu_bins) - 1))
-
-    return (r['npairs'].reshape((len(s_bins) - 1, len(mu_bins) - 1)) /
-            n_exp[:, np.newaxis] - 1)
-
-
-def read_abacus_summit_catalog(simulation, redshift):
-
-    as_path = os.path.join('/', 'global', 'cfs', 'cdirs', 'desi',
-                           'cosmosim', 'Abacus', 'AbacusSummit_')
-
-    fields = ['id', 'x_L2com', 'v_L2com', 'N', 'rvcirc_max_com']
-    halocat = CompaSOHaloCatalog(os.path.join(
-        as_path + simulation, 'halos', 'z{:.3f}'.format(redshift)),
-        fields=fields)
-
-    mdef = '{:.0f}m'.format(halocat.header['SODensityL1'])
-    cosmology = w0waCDM(H0=halocat.header['H0'], Om0=halocat.header['Omega_M'],
-                        Ode0=halocat.header['Omega_DE'],
-                        w0=halocat.header['w0'], wa=halocat.header['wa'])
-
-    halocat.halos['x_L2com'] += halocat.header['BoxSize'] / 2.0
-    halocat.halos['SO_mass'] = (halocat.halos['N'] *
-                                halocat.header['ParticleMassHMsun'])
-    halocat.halos = halocat.halos[halocat.halos['N'] > 300]
-
-    dvir = delta_vir(cosmology, redshift) * 200 / (18 * np.pi**2)
-    rho_crit = (cosmology.critical_density(redshift) /
-                (cosmology.H(0).value / 100)**2 / (1 + redshift)**3)
-    halocat.halos['SO_radius'] = ((halocat.halos['SO_mass'] * u.M_sun / (
-        4.0 / 3.0 * np.pi * rho_crit * dvir))**(1.0 / 3.0)).to(u.Mpc).value
-
-    return UserSuppliedHaloCatalog(
-        redshift=redshift, Lbox=halocat.header['BoxSize'],
-        particle_mass=halocat.header['ParticleMassHMsun'],
-        simname=simulation,
-        halo_x=halocat.halos['x_L2com'][:, 0],
-        halo_y=halocat.halos['x_L2com'][:, 1],
-        halo_z=halocat.halos['x_L2com'][:, 2],
-        halo_vx=halocat.halos['v_L2com'][:, 0],
-        halo_vy=halocat.halos['v_L2com'][:, 1],
-        halo_vz=halocat.halos['v_L2com'][:, 2],
-        halo_id=halocat.halos['id'],
-        halo_pid=np.repeat(-1, len(halocat.halos)),
-        halo_upid=np.repeat(-1, len(halocat.halos)),
-        halo_nfw_conc=halocat.halos['SO_radius'] / (
-            halocat.halos['rvcirc_max_com'] / 2.16258),
-        halo_mvir=halocat.halos['SO_mass'],
-        halo_rvir=halocat.halos['SO_radius'] * 1e-9,
-        halo_hostid=halocat.halos['id'], cosmology=cosmology,
-        **{'halo_m{}'.format(mdef): halocat.halos['SO_mass'],
-           'halo_r{}'.format(mdef): halocat.halos['SO_radius']}), mdef
-
-
-def output_directory(simulation, redshift):
-    return os.path.join(
-        simulation, '{:.1f}'.format(redshift).replace('.', 'p'))
+    return halotab_mult
 
 
 def main():
@@ -134,28 +29,35 @@ def main():
         description='Tabulate AbacusSummit halo catalogs.')
     parser.add_argument('simulation', help='simulation')
     parser.add_argument('redshift', help='simulation redshift', type=float)
+    parser.add_argument('config', help='which configuration to assume')
 
     args = parser.parse_args()
 
-    path = output_directory(args.simulation, args.redshift)
-    if not os.path.isdir(path):
-        os.makedirs(path)
+    path = xolmis.simulation_directory(args.simulation, args.redshift)
 
-    halocat, mdef = read_abacus_summit_catalog(args.simulation, args.redshift)
-
-    rp_bins = np.logspace(-1.5, 1.477, 26)
+    halocat = xolmis.read_simulation(args.simulation, args.redshift)
+    for key in halocat.halo_table.colnames:
+        if key[:6] == 'halo_m':
+            mdef = key[6:]
     cens_prof_model = TrivialPhaseSpace(redshift=halocat.redshift, mdef=mdef)
     sats_prof_model = NFWPhaseSpace(redshift=halocat.redshift, mdef=mdef,
                                     cosmology=halocat.cosmology)
 
-    halotab = TabCorr.tabulate(
-        halocat, wp_corrfunc, rp_bins, pi_max=40,
-        cens_prof_model=cens_prof_model, sats_prof_model=sats_prof_model,
-        verbose=True, num_threads=34,
-        sats_per_prim_haloprop=1e-12 if halocat.Lbox[0] <= 1000 else 1e-13,
-        project_xyz=True)
+    halotab_s_mu = TabCorr.tabulate(
+        halocat, s_mu_tpcf, xolmis.S_BINS[args.config],
+        xolmis.MU_BINS[args.config], cens_prof_model=cens_prof_model,
+        sats_prof_model=sats_prof_model, verbose=True,
+        num_threads=multiprocessing.cpu_count(),
+        sats_per_prim_haloprop=1e-13, project_xyz=False,
+        prim_haloprop_bins=100, prim_haloprop_key='halo_mvir',
+        sec_haloprop_key='halo_nfw_conc', sec_haloprop_percentile_bins=0.5,
+        cosmology_obs=xolmis.COSMOLOGY_OBS[args.config])
 
-    halotab.write(os.path.join(path, 'wp.hdf5'), overwrite=True)
+    for order in [0, 2, 4]:
+        halotab_multipole = tabcorr_s_mu_to_multipole(
+            halotab_s_mu, xolmis.MU_BINS[args.config], order)
+        halotab_multipole.write(os.path.join(path, 'xi_{}.hdf5'.format(order)),
+                                overwrite=True)
 
 
 if __name__ == "__main__":
