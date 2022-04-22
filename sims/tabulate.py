@@ -48,7 +48,7 @@ def main():
         xolmis.MU_BINS[args.config], cens_prof_model=cens_prof_model,
         sats_prof_model=sats_prof_model, verbose=True,
         num_threads=multiprocessing.cpu_count(),
-        sats_per_prim_haloprop=1e-13, project_xyz=False,
+        sats_per_prim_haloprop=2e-13, project_xyz=True,
         prim_haloprop_bins=100, prim_haloprop_key='halo_mvir',
         sec_haloprop_key='halo_nfw_conc', sec_haloprop_percentile_bins=0.5,
         cosmology_obs=xolmis.COSMOLOGY_OBS[args.config])

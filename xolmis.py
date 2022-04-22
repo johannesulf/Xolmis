@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from tabcorr import TabCorr
 from astropy.table import Table
 from astropy.cosmology import w0waCDM, Planck15
 from Corrfunc.theory import DDrppi, DDsmu
@@ -51,7 +52,7 @@ def s_mu_tpcf_corrfunc(sample1, s_bins, mu_bins, sample2=None, randoms=None,
                   sample1[:, 1], sample1[:, 2], periodic=True,
                   boxsize=period, xbin_refine_factor=1,
                   ybin_refine_factor=1, zbin_refine_factor=1)
-        n_exp = (len(sample1) * len(sample1) / np.prod(period) * 4 *
+        n_exp = (len(sample1) * len(sample1) / period**3 * 4 *
                  np.pi / 3 * np.diff(s_bins**3) / (len(mu_bins) - 1))
 
     elif do_cross:
@@ -60,7 +61,7 @@ def s_mu_tpcf_corrfunc(sample1, s_bins, mu_bins, sample2=None, randoms=None,
                   boxsize=period, X2=sample2[:, 0],
                   Y2=sample2[:, 1], Z2=sample2[:, 2], xbin_refine_factor=1,
                   ybin_refine_factor=1, zbin_refine_factor=1)
-        n_exp = (len(sample1) * len(sample2) / np.prod(period) * 4 *
+        n_exp = (len(sample1) * len(sample2) / period**3 * 4 *
                  np.pi / 3 * np.diff(s_bins**3) / (len(mu_bins) - 1))
 
     return (r['npairs'].reshape((len(s_bins) - 1, len(mu_bins) - 1)) /
@@ -94,3 +95,11 @@ def read_simulation(simulation, redshift):
         halo_hostid=np.arange(len(halos)), cosmology=cosmology,
         **{'halo_m{}'.format(mdef): halos['halo_m{}'.format(mdef)],
            'halo_r{}'.format(mdef): halos['halo_r{}'.format(mdef)]})
+
+def read_halotab(simulation, redshift):
+    halotab = {}
+    path = simulation_directory(simulation, redshift)
+    for order in [0, 2, 4]:
+        halotab['xi{}'.format(order)] = TabCorr.read(os.path.join(
+            path, 'xi_{}.hdf5'.format(order)))
+    return halotab
