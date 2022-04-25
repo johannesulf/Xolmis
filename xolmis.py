@@ -7,7 +7,8 @@ from Corrfunc.theory import DDrppi, DDsmu
 from halotools.sim_manager import UserSuppliedHaloCatalog
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-S_BINS = {'DESI-2': np.logspace(-1.0, 1.8, 15)}
+S_BINS = {'DESI-2': np.logspace(-1.0, 1.8, 15),
+          'default': np.logspace(-1.0, 1.8, 15)}
 MU_BINS = {'DESI-2': np.linspace(0, 1, 21)}
 COSMOLOGY_OBS = {'DESI-2': Planck15}
 

@@ -1,7 +1,6 @@
 import os
 import xolmis
 import numpy as np
-import pyswarms as ps
 from astropy.table import Table
 from scipy.optimize import minimize
 from halotools.empirical_models import HodModelFactory
@@ -10,7 +9,8 @@ from halotools.empirical_models import AssembiasZheng07Sats
 
 # %%
 
-simulation_list = ['base_c000_ph000', 'base_c112_ph000', 'base_c113_ph000']
+simulation_list = ['base_c000_ph000', 'base_c102_ph000', 'base_c108_ph000',
+                   'base_c109_ph000', 'base_c112_ph000', 'base_c113_ph000']
 redshift = 0.8
 
 
@@ -47,8 +47,8 @@ def prediction(theta):
     model.param_dict['mean_occupation_satellites_assembias_param1'] = (
         theta[7] * 2 - 1)
     n, xi = halotab['xi0'].predict(model)
-    xi = np.concatenate([xi, halotab['xi2'].predict(model)[1],
-                         halotab['xi4'].predict(model)[1]])
+    xi = np.concatenate([xi[5:], halotab['xi2'].predict(model)[1][5:],
+                         halotab['xi4'].predict(model)[1][5:]])
     return n, xi
 
 
@@ -74,18 +74,16 @@ for fname in fname_list:
     data = Table.read(os.path.join(xolmis.BASE_DIR, 'desi-2', 'mocks', fname))
     n_jk = data['xi0_jk'].shape[1]
 
-    xi_obs = np.concatenate([data['xi0'], data['xi2'], data['xi4']])
+    xi_obs = np.concatenate(
+        [data['xi0'][5:], data['xi2'][5:], data['xi4'][5:]])
     xi_cov = np.cov(np.vstack(
-        [data['xi0_jk'], data['xi2_jk'], data['xi4_jk']]))
+        [data['xi0_jk'][5:], data['xi2_jk'][5:], data['xi4_jk'][5:]]))
     xi_cov *= n_jk
+    xi_cov /= (n_jk - len(xi_obs) - 1) / n_jk
+    # downeight small scales in the first fit while there are issues with gumbo
+    xi_pre = np.linalg.inv(xi_cov)
     np.savetxt(fname.split('.')[0] + '_cov.csv', xi_cov)
 
-    # downeight small scales in the first fit while there are issues with gumbo
-    xi_cov[:5, :5] *= 100
-    xi_cov[14:19, 14:19] *= 100
-    xi_cov[28:33, 28:33] *= 100
-    xi_pre = np.linalg.inv(xi_cov)
-    xi_pre *= (n_jk - len(xi_obs) - 1) / n_jk
     n_obs = float(fname.split('.')[0].replace('p', '.'))
 
     table = Table()
@@ -96,21 +94,16 @@ for fname in fname_list:
     for i, simulation in enumerate(simulation_list):
         halotab = xolmis.read_halotab(simulation, redshift)
 
-        print(fname, simulation)
         if i == 0:
             result = minimize(chi_squared, x0=np.ones(n_dim) * 0.4, tol=1e-15,
                               bounds=[(0.2, 0.8) for i in range(n_dim)])
             theta = result.x
             n_obs, xi_obs = prediction(theta)
-            # undo the downweighting
-            xi_cov[:5, :5] /= 100
-            xi_cov[14:19, 14:19] /= 100
-            xi_cov[28:33, 28:33] /= 100
-            xi_pre = np.linalg.inv(xi_cov)
-            xi_pre *= (n_jk - len(xi_obs) - 1) / n_jk
         else:
             result = minimize(chi_squared, x0=theta, tol=1e-15,
                               bounds=[(0, 1) for i in range(n_dim)])
-        print(result.x, result.fun)
+            print(simulation, fname.split('.')[0], '{:.3f}'.format(result.fun))
+        if np.any(np.abs(result.x - 0.5) > 0.49):
+            print('Warning! Fit ran into the prior!')
         table['n'][i], table['xi'][i] = prediction(result.x)
     table.write(fname, path='data', overwrite=True)
