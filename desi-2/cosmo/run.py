@@ -11,6 +11,42 @@ from scipy.stats import norm as gauss
 path = os.path.join(xolmis.BASE_DIR, 'desi-2', 'fits')
 fname_list = os.listdir(path)
 
+# %%
+
+s = np.sqrt(xolmis.S_BINS['default'][1:] * xolmis.S_BINS['default'][:-1])[5:]
+
+for fname in fname_list:
+
+    if fname[-5:] != '.hdf5':
+        continue
+
+    n = float(fname.split('.')[0].replace('p', '.'))
+
+    xi_obs = Table.read(os.path.join(path, fname))['xi'][0]
+    xi_cov = np.genfromtxt(os.path.join(path, fname[:-5] + '_cov.csv'))
+    xi_err = np.sqrt(np.diag(xi_cov))
+
+    for i, (color, order) in enumerate(
+            zip(matplotlib.cm.plasma([0.8, 0.5, 0.2]), [0, 2, 4])):
+        plotline, caps, barlinecols = plt.errorbar(
+            s * (1 + order / 50), s**1.5 * np.split(xi_obs, 3)[i],
+            yerr=10 * s**1.5 * np.split(xi_err, 3)[i], color=color, fmt='o',
+            ms=4)
+        plt.setp(barlinecols[0], capstyle='round')
+        plt.text(0.05 + order / 30, 0.05, r'$\xi_' + str(order) + '$',
+                 color=color, transform=plt.gca().transAxes, ha='left',
+                 va='bottom')
+
+    plt.xlabel(r'$s \, [h^{-1} \, \mathrm{Mpc}]$')
+    plt.ylabel(r'$s^{1.5} \times \xi_n \, [h^{-1.5} \, \mathrm{Mpc}^{1.5}]$')
+    plt.xscale('log')
+    plt.tight_layout(pad=0.3)
+    plt.savefig(fname[:-5] + '_obs.pdf')
+    plt.savefig(fname[:-5] + '_obs.png', dpi=300)
+    plt.close()
+
+# %%
+
 simulation_list = ['base_c000_ph000', 'base_c102_ph000', 'base_c108_ph000',
                    'base_c109_ph000', 'base_c112_ph000', 'base_c113_ph000']
 parameter_list = [None, 'omega_m', 'w_0', 'w_0', 'sigma_8', 'sigma_8']
@@ -31,8 +67,6 @@ for fname in fname_list:
 
     assert np.all(table['simulation'] == np.array(simulation_list))
 
-    s = np.sqrt(
-        xolmis.S_BINS['default'][1:] * xolmis.S_BINS['default'][:-1])[5:]
     fig, axarr = plt.subplots(figsize=(7, 3.5), ncols=3, sharex=True,
                               sharey=True)
     axarr[0].set_title(r'$\Omega_{\rm m}$')
@@ -70,12 +104,16 @@ for fname in fname_list:
         ax.axhline(0, ls=':', color='black', zorder=0)
         ax.set_xlabel(r'$s \, [h^{-1} \, \mathrm{Mpc}]$')
 
+    for color, order in zip(matplotlib.cm.plasma([0.8, 0.5, 0.2]), [0, 2, 4]):
+        axarr[0].text(0.05 + order / 20, 0.05, r'$\xi_' + str(order) + '$',
+                      color=color, transform=axarr[0].transAxes, ha='left',
+                      va='bottom')
     axarr[0].set_ylabel(r'$\partial D / \partial \theta \, \sigma_D^{-1}$')
     plt.ylim(-yabsmax, +yabsmax)
     plt.tight_layout(pad=0.3)
     plt.subplots_adjust(wspace=0)
-    plt.savefig(fname[:-5] + '_derivative.pdf')
-    plt.savefig(fname[:-5] + '_derivative.png', dpi=300)
+    plt.savefig(fname[:-5] + '_der.pdf')
+    plt.savefig(fname[:-5] + '_der.png', dpi=300)
     plt.close()
 
     d_xi = np.vstack([d_xi_dict['omega_m'], d_xi_dict['w_0'],
@@ -106,8 +144,12 @@ for i in range(axarr.shape[0]):
                 err = np.sqrt(np.diag(cov))[i]
                 err_max = max(err_max, err)
                 x = np.linspace(-5 * err, +5 * err, 1000) + x0[i]
+                b = int(np.floor(np.log10(n)))
                 axarr[i, j].plot(x, gauss.pdf(x, loc=x0[i], scale=err),
-                                 color=cmap(norm(np.log(n))))
+                                 color=cmap(norm(np.log(n))),
+                                 label=r'$n_{\rm gal} =' +
+                                 '{:.0f}'.format(n / 10**b) + r'\times 10^{' +
+                                 '{}'.format(b) + '}$')
 
             axarr[i, j].set_xlim(x0[i] - 2 * err_max, x0[i] + 2 * err_max)
             axarr[i, j].set_ylim(ymin=0)
@@ -139,6 +181,10 @@ axarr[2, 0].set_ylabel(r'$\sigma_8$')
 axarr[2, 0].set_xlabel(r'$\Omega_{\rm m}$')
 axarr[2, 1].set_xlabel(r'$w_0$')
 axarr[2, 2].set_xlabel(r'$\sigma_8$')
+
+handles, labels = axarr[0, 0].get_legend_handles_labels()
+axarr[0, 2].legend(handles, labels, loc='right', frameon=False)
+
 
 for ax in axarr[:, 0]:
     for tick in ax.get_yticklabels():
