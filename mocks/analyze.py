@@ -54,3 +54,4 @@ for fname in fname_list:
     plt.yticks([7, 21, 35], [r'$\xi_0$', r'$\xi_2$', r'$\xi_4$'])
     plt.savefig(fname[:-5] + '_cov.pdf')
     plt.savefig(fname[:-5] + '_cov.png', dpi=300)
+    plt.close()
