@@ -1,69 +1,41 @@
 import os
 import xolmis
+import matplotlib
 import numpy as np
 from astropy.table import Table
-import matplotlib
 import matplotlib.pyplot as plt
+from tabulous.config import s_bins
 from scipy.stats import norm as gauss
 
 # %%
 
-path = os.path.join(xolmis.BASE_DIR, 'desi-2', 'fits')
+s = np.sqrt(s_bins['default'][1:] * s_bins['default'][:-1])
+
+path = os.path.join(xolmis.BASE_DIR, 'fits')
 fname_list = os.listdir(path)
 
-# %%
-
-s = np.sqrt(xolmis.S_BINS['default'][1:] * xolmis.S_BINS['default'][:-1])[5:]
-
-for fname in fname_list:
-
-    if fname[-5:] != '.hdf5':
-        continue
-
-    n = float(fname.split('.')[0].replace('p', '.'))
-
-    xi_obs = Table.read(os.path.join(path, fname))['xi'][0]
-    xi_cov = np.genfromtxt(os.path.join(path, fname[:-5] + '_cov.csv'))
-    xi_err = np.sqrt(np.diag(xi_cov))
-
-    for i, (color, order) in enumerate(
-            zip(matplotlib.cm.plasma([0.8, 0.5, 0.2]), [0, 2, 4])):
-        plotline, caps, barlinecols = plt.errorbar(
-            s * (1 + order / 50), s**1.5 * np.split(xi_obs, 3)[i],
-            yerr=10 * s**1.5 * np.split(xi_err, 3)[i], color=color, fmt='o',
-            ms=4)
-        plt.setp(barlinecols[0], capstyle='round')
-        plt.text(0.05 + order / 30, 0.05, r'$\xi_' + str(order) + '$',
-                 color=color, transform=plt.gca().transAxes, ha='left',
-                 va='bottom')
-
-    plt.xlabel(r'$s \, [h^{-1} \, \mathrm{Mpc}]$')
-    plt.ylabel(r'$s^{1.5} \times \xi_n \, [h^{-1.5} \, \mathrm{Mpc}^{1.5}]$')
-    plt.xscale('log')
-    plt.tight_layout(pad=0.3)
-    plt.savefig(fname[:-5] + '_obs.pdf')
-    plt.savefig(fname[:-5] + '_obs.png', dpi=300)
-    plt.close()
-
-# %%
-
-simulation_list = ['base_c000_ph000', 'base_c102_ph000', 'base_c108_ph000',
-                   'base_c109_ph000', 'base_c112_ph000', 'base_c113_ph000']
-parameter_list = [None, 'omega_m', 'w_0', 'w_0', 'sigma_8', 'sigma_8']
-perturbation_list = [None, +0.02255, +0.1, -0.1, +0.807952 * 0.02,
-                     -0.807952 * 0.02]
+simulation_list = ['base_c000_ph000', 'base_c103_ph000',
+                   'base_c109_ph000', 'base_c113_ph000']
+parameter_list = [None, 'omega_m', 'w_0', 'sigma_8']
+perturbation_list = [None, -0.02255, -0.1, -0.807952 * 0.02]
 cov_list = []
 n_list = []
 
 for fname in fname_list:
 
-    if fname[-5:] != '.hdf5':
+    try:
+        n = float(fname.split('.')[0].replace('p', '.'))
+    except ValueError:
         continue
 
-    n_list.append(float(fname.split('.')[0].replace('p', '.')))
+    n_list.append(n)
+
+    table = Table.read(os.path.join(xolmis.BASE_DIR, 'mocks', fname))
+    n_jk = table['xi0_jk'].shape[1]
+    xi_cov = np.cov(np.vstack([
+        table['xi0_jk'], table['xi2_jk'], table['xi4_jk']])) * n_jk
 
     table = Table.read(os.path.join(path, fname))
-    xi_cov = np.genfromtxt(os.path.join(path, fname[:-5] + '_cov.csv'))
 
     assert np.all(table['simulation'] == np.array(simulation_list))
 
