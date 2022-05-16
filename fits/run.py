@@ -14,7 +14,7 @@ from halotools.empirical_models import AssembiasZheng07Sats
 simulation_list = ['base_c000_ph000', 'base_c103_ph000', 'base_c109_ph000',
                    'base_c113_ph000']#, 'base_c112_ph000', 'base_c113_ph000']
 redshift = 0.2
-n_dim = 10
+n_dim = 11
 
 # %%
 
@@ -40,11 +40,13 @@ def prediction(theta):
         theta[6] * 2 - 1)
     model.param_dict['mean_occupation_satellites_assembias_param1'] = (
         theta[7] * 2 - 1)
-    model.param_dict['alpha_s'] = 0.8 + 0.399999 * theta[8]
-    model.param_dict['alpha_c'] = 0.399999 * theta[9]
-    n, xi = halotab['xi0'].predict(model)
-    xi = np.concatenate([xi, halotab['xi2'].predict(model)[1],
-                         halotab['xi4'].predict(model)[1]])
+    model.param_dict['alpha_s'] = 0.7 + 0.6 * theta[8]
+    model.param_dict['alpha_c'] = 0.5 * theta[9]
+    model.param_dict['log_eta'] = -np.log(5) + theta[10] * 2 * np.log(5)
+    n, xi0 = halotab['xi0'].predict(model, same_halos=True, extrapolate=True)
+    n, xi2 = halotab['xi2'].predict(model, same_halos=True, extrapolate=True)
+    n, xi4 = halotab['xi4'].predict(model, same_halos=True, extrapolate=True)
+    xi = np.concatenate([xi0, xi2, xi4])
     return n, xi
 
 
@@ -64,7 +66,7 @@ def chi_squared(theta):
 
 path = os.path.join(xolmis.BASE_DIR, 'mocks')
 fname_list = os.listdir(path)
-s_min_list = [40, 0.1, 1.0, 10.0]
+s_min_list = [0.1, 1.0, 5.0, 10.0]
 
 print('n_gal \t simulation \t\t s_min \t chi^2')
 
@@ -82,10 +84,9 @@ for fname in fname_list:
     xi_cov = np.cov(np.vstack([
         data['xi0_jk'], data['xi2_jk'], data['xi4_jk']]))
     xi_cov *= n_jk
-    xi_pre = np.linalg.inv(xi_cov)
 
     table = Table()
-    table['simulation'] = np.repeat(simulation_list, 4)
+    table['simulation'] = np.repeat(simulation_list, len(s_min_list))
     table['s_min'] = np.tile(s_min_list, len(simulation_list))
     table['n'] = np.zeros(len(table))
     table['xi'] = np.zeros((len(table), len(xi_obs)))
