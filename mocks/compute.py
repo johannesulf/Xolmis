@@ -1,4 +1,5 @@
 import tqdm
+import xolmis
 import itertools
 import numpy as np
 from astropy.table import Table
@@ -48,15 +49,14 @@ def xi_from_dd(dd, n, boxsize, s_bins, mu_bins):
             rr[:, np.newaxis] - 1)
 
 
-for ngal_cut in ngal_cut_list:
+for ngal in xolmis.NGAL:
 
     table = Table()
-    table.meta['ngal'] = ngal_cut
+    table.meta['ngal'] = ngal
 
-    ngal_cut *= boxsize**3
-    mabs_cut = np.percentile(
-        mock['M'], 100 * (1 - (ngal_cut / len(mock))))
-    select = mock['M'] > mabs_cut
+    ngal *= boxsize**3
+    mabs_cut = np.percentile(mock['M'], 100 * (ngal / len(mock)))
+    select = mock['M'] < mabs_cut
 
     dd_all = np.zeros((len(s_bins) - 1) * (len(mu_bins) - 1))
     for xyz in ['xyz', 'yzx', 'zxy']:
@@ -100,5 +100,5 @@ for ngal_cut in ngal_cut_list:
             table['xi{}_jk'.format(order)][:, i] = tpcf_multipole(
                 xi, mu_bins, order=order)
 
-    table.write('{}'.format(ngal_cut / boxsize**3).replace('.', 'p') + '.hdf5',
+    table.write('{}'.format(ngal / boxsize**3).replace('.', 'p') + '.hdf5',
                 overwrite=True, path='data')

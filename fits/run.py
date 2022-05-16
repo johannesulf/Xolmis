@@ -40,9 +40,9 @@ def prediction(theta):
         theta[6] * 2 - 1)
     model.param_dict['mean_occupation_satellites_assembias_param1'] = (
         theta[7] * 2 - 1)
-    model.param_dict['alpha_s'] = 0.7 + 0.6 * theta[8]
-    model.param_dict['alpha_c'] = 0.5 * theta[9]
-    model.param_dict['log_eta'] = -np.log(5) + theta[10] * 2 * np.log(5)
+    model.param_dict['alpha_s'] = 0.8 + 0.4 * theta[8]
+    model.param_dict['alpha_c'] = 0.4 * theta[9]
+    model.param_dict['log_eta'] = -np.log(3) + theta[10] * 2 * np.log(3)
     n, xi0 = halotab['xi0'].predict(model, same_halos=True, extrapolate=True)
     n, xi2 = halotab['xi2'].predict(model, same_halos=True, extrapolate=True)
     n, xi4 = halotab['xi4'].predict(model, same_halos=True, extrapolate=True)
@@ -56,8 +56,6 @@ def chi_squared(theta):
     s = np.sqrt(s_bins['default'][1:] * s_bins['default'][:-1])
     select = np.tile(s > s_min, 3)
     d_xi = (xi_mod - xi_obs)[select]
-    xi_pre = np.linalg.inv(xi_cov[np.outer(select, select)].reshape(
-        (len(d_xi), len(d_xi))))
     chi_sq += np.dot(np.dot((d_xi), xi_pre), d_xi)
     return chi_sq
 
@@ -68,59 +66,69 @@ path = os.path.join(xolmis.BASE_DIR, 'mocks')
 fname_list = os.listdir(path)
 s_min_list = [0.1, 1.0, 5.0, 10.0]
 
-print('n_gal \t simulation \t\t s_min \t chi^2')
+print('n_gal \t simulation \t\t s_min \t type \t chi^2')
 
-for fname in fname_list:
+for model_obs in ['sham', 'hod']:
+    for n_obs in xolmis.NGAL:
 
-    try:
-        n_obs = float(fname.split('.')[0].replace('p', '.'))
-    except ValueError:
-        continue
+        xi_obs, xi_cov = xolmis.read_mock_observations(n_obs)
 
-    data = Table.read(os.path.join(xolmis.BASE_DIR, 'mocks', fname))
-    n_jk = data['xi0_jk'].shape[1]
+        table = Table()
+        table['simulation'] = np.repeat(simulation_list, len(s_min_list))
+        table['s_min'] = np.tile(s_min_list, len(simulation_list))
+        table['n'] = np.zeros(len(table))
+        table['xi'] = np.zeros((len(table), len(xi_obs)))
 
-    xi_obs = np.concatenate([data['xi0'], data['xi2'], data['xi4']])
-    xi_cov = np.cov(np.vstack([
-        data['xi0_jk'], data['xi2_jk'], data['xi4_jk']]))
-    xi_cov *= n_jk
+        guess = np.ones(n_dim) * 0.5
 
-    table = Table()
-    table['simulation'] = np.repeat(simulation_list, len(s_min_list))
-    table['s_min'] = np.tile(s_min_list, len(simulation_list))
-    table['n'] = np.zeros(len(table))
-    table['xi'] = np.zeros((len(table), len(xi_obs)))
+        for i in range(len(table)):
 
-    guess = np.ones(n_dim) * 0.5
+            simulation = table['simulation'][i]
+            s_min = table['s_min'][i]
 
-    for i in range(len(table)):
+            xi_obs, xi_cov = xolmis.read_mock_observations(n_obs)
+            s = np.sqrt(s_bins['default'][1:] * s_bins['default'][:-1])
+            select = np.tile(s > s_min, 3)
+            xi_pre = np.linalg.inv(xi_cov[np.outer(select, select)].reshape(
+                (np.sum(select), np.sum(select))))
 
-        simulation = table['simulation'][i]
-        s_min = table['s_min'][i]
+            halotab = {}
+            for order in [0, 2, 4]:
+                halotab['xi{}'.format(order)] = read_tabcorr(
+                    'AbacusSummit', int(simulation[6:9]), redshift,
+                    'xi{}'.format(order))
 
-        halotab = {}
-        for order in [0, 2, 4]:
-            halotab['xi{}'.format(order)] = read_tabcorr(
-                'AbacusSummit', int(simulation[6:9]), redshift,
-                'xi{}'.format(order))
+            prim_haloprop_key = halotab['xi0'].tabcorr_list[0].attrs[
+                'prim_haloprop_key']
+            cens_occ_model = IncompleteAssembiasZheng07Cens(
+                prim_haloprop_key=prim_haloprop_key,
+                sec_haloprop_key='halo_nfw_conc')
+            sats_occ_model = AssembiasZheng07Sats(
+                prim_haloprop_key=prim_haloprop_key,
+                sec_haloprop_key='halo_nfw_conc')
+            model = HodModelFactory(centrals_occupation=cens_occ_model,
+                                    satellites_occupation=sats_occ_model,
+                                    redshift=redshift)
+            bounds = [(0.0, 1.0) for i in range(n_dim)]
 
-        prim_haloprop_key = halotab['xi0'].tabcorr_list[0].attrs[
-            'prim_haloprop_key']
-        cens_occ_model = IncompleteAssembiasZheng07Cens(
-            prim_haloprop_key=prim_haloprop_key,
-            sec_haloprop_key='halo_nfw_conc')
-        sats_occ_model = AssembiasZheng07Sats(
-            prim_haloprop_key=prim_haloprop_key,
-            sec_haloprop_key='halo_nfw_conc')
-        model = HodModelFactory(centrals_occupation=cens_occ_model,
-                                satellites_occupation=sats_occ_model,
-                                redshift=redshift)
+            if i == 0 and model_obs == 'hod':
+                bounds = [(0.2, 0.8) for i in range(n_dim)]
 
-        result = minimize(chi_squared, x0=guess, tol=1e-15,
-                          bounds=[(0.0, 1.0) for i in range(n_dim)])
-        best_fit = result.x
-        print('{} \t {} \t {:.1f} \t {:.1f}'.format(
-            n_obs, simulation, s_min, result.fun))
-        table['n'][i], table['xi'][i] = prediction(best_fit)
+            result = minimize(chi_squared, x0=guess, tol=1e-15, bounds=bounds)
+            best_fit = result.x
 
-    table.write(fname, path='data', overwrite=True)
+            if i == 0:
+                guess = best_fit
+
+            if i == 0 and model_obs == 'hod':
+                xi_obs = prediction(best_fit)[1]
+
+            if model_obs == 'hod' and np.any(np.abs(result.x - 0.5) > 0.49):
+                print('Warning! Fit ran into the prior!')
+
+            print('{} \t {} \t {:.1f} \t {} \t {:.1f}'.format(
+                n_obs, simulation, s_min, model_obs, result.fun))
+            table['n'][i], table['xi'][i] = prediction(best_fit)
+
+        table.write(model_obs + '_{}'.format(n_obs).replace('.', 'p') +
+                    '.hdf5', path='data', overwrite=True)
