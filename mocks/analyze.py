@@ -73,4 +73,5 @@ for order, xi_rel_err_list in zip(
     plt.yscale('log')
     plt.tight_layout(pad=0.3)
     plt.savefig('xi{}_pre.pdf'.format(order))
+    plt.savefig('xi{}_pre.png'.format(order), dpi=300)
     plt.close()
