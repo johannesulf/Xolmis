@@ -10,12 +10,14 @@ abs_mag = fstream['Data/abs_mag'][()]
 mask = abs_mag < -19
 abs_mag = abs_mag[mask]
 g_r = fstream['Data/g_r'][()][mask]
+cen = fstream['Data/galaxy_type'][()][mask] == 0
 pos = fstream['Data/pos'][()][mask]
 vel = fstream['Data/vel'][()][mask]
 
 table = Table()
 table['M'] = abs_mag.astype(np.float32)
 table['g-r'] = g_r.astype(np.float32)
+table['cen'] = cen
 table['x'] = pos[:, 0].astype(np.float32)
 table['y'] = pos[:, 1].astype(np.float32)
 table['z'] = pos[:, 2].astype(np.float32)

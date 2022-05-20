@@ -21,16 +21,10 @@ plt.hist2d(mock['M'], mock['g-r'], bins=100)
 cb = plt.colorbar()
 plt.xlabel(r'Absolute magnitude $M_r$')
 plt.ylabel(r'Color $g-r$')
-m_plot = np.linspace(np.amin(mock['M']), np.amax(mock['M']), 10)
-plt.plot(m_plot, 0.21 - 0.03 * m_plot, ls='--', color='red')
 plt.tight_layout(pad=0.3)
 plt.savefig('mabs_vs_gr.pdf')
 plt.savefig('mabs_vs_gr.png', dpi=300)
 plt.close()
-
-# %%
-
-mock = mock[mock['g-r'] > 0.21 - 0.03 * mock['M']]
 
 # %%
 
@@ -57,6 +51,9 @@ for ngal in xolmis.NGAL:
     ngal *= boxsize**3
     mabs_cut = np.percentile(mock['M'], 100 * (ngal / len(mock)))
     select = mock['M'] < mabs_cut
+    print('n_gal: {:.1e}'.format(ngal / boxsize**3))
+    print('M_r: {:.1f}'.format(mabs_cut))
+    print('f_sat: {:.2f}'.format(1 - np.mean(mock['cen'][select])))
 
     dd_all = np.zeros((len(s_bins) - 1) * (len(mu_bins) - 1))
     for xyz in ['xyz', 'yzx', 'zxy']:
