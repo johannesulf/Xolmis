@@ -83,8 +83,46 @@ def fit_cosmology(table, ngal, s_min, axarr=None, color=None, label=None,
 
 # %%
 
+err = []
 
-for model_obs in ['sham', 'hod']:
+for ngal in xolmis.NGAL:
+
+    table = Table.read(os.path.join(
+        xolmis.BASE_DIR, 'fits',  'hod_{}'.format(ngal).replace(
+            '.', 'p') + '.hdf5'))
+
+    err.append([])
+    for s_min in np.unique(table['s_min']):
+        err[-1].append(np.sqrt(np.diag(fit_cosmology(table, ngal, s_min)[2])))
+
+err = np.array(err)
+
+# %%
+
+s_bin = 1
+for param, label in zip([0, 1, 2], [r'$\Omega_{\rm m, 0}$', r'$w_0$',
+                                    r'$\sigma_8$']):
+    plt.plot(xolmis.NGAL, err[:, s_bin, param] / err[0, s_bin, param],
+             label=label)
+plt.title(r'$s_{\rm min} =' + '{:.1f}'.format(np.unique(
+    table['s_min'])[s_bin]) + r'\, \mathrm{Mpc} / h$')
+plt.legend(loc='best', frameon=False)
+plt.xscale('log')
+plt.ylim(ymin=0)
+plt.gca().set_xticks([], minor=True)
+plt.xticks(xolmis.NGAL, [r'$5 \times 10^{-4}$', r'$1 \times 10^{-3}$',
+                         r'$2 \times 10^{-3}$'])
+plt.xlabel(r'$n_{\rm gal} \, [h^3 \, \mathrm{Mpc}^{-3}]$')
+plt.ylabel(r'Uncertaintity')
+plt.tight_layout(pad=0.3)
+plt.savefig('cosmo_vs_ngal.pdf')
+plt.savefig('cosmo_vs_ngal.png', dpi=300)
+plt.close()
+
+# %%
+
+
+for model_obs in ['hod']:
     for ngal in xolmis.NGAL:
 
         table = Table.read(os.path.join(
@@ -97,7 +135,7 @@ for model_obs in ['sham', 'hod']:
         x_min = truth
         x_max = truth
 
-        s_min_list = [0.1, 1.0, 5.0, 10.0]
+        s_min_list = [0.1, 1.0, 4.0, 10.0]
 
         cmap = matplotlib.cm.plasma
         vmin, vmax = np.log(np.amin(s_min_list)), np.log(np.amax(s_min_list))
@@ -108,9 +146,11 @@ for model_obs in ['sham', 'hod']:
         for s_min in s_min_list:
             label = (r'$s_{\rm min} = ' + '{:g}'.format(s_min) +
                      r'\, \mathrm{Mpc}/h$')
-            d_xi, mu, cov = fit_cosmology(table, ngal, s_min, axarr=axarr,
-                                          color=cmap(norm(np.log(s_min))),
-                                          center_on_truth=False, label=label)
+            d_xi, mu, cov = fit_cosmology(
+                table, ngal, s_min, axarr=axarr,
+                color=cmap(norm(np.log(s_min))),
+                center_on_truth=(model_obs == 'hod'),
+                label=label)
             x_min = np.minimum(x_min, mu - 2.5 * np.sqrt(np.diag(cov)))
             x_max = np.maximum(x_max, mu + 2.5 * np.sqrt(np.diag(cov)))
 
@@ -124,7 +164,7 @@ for model_obs in ['sham', 'hod']:
             for j in range(axarr.shape[1]):
                 if i < j:
                     axarr[i, j].axis('off')
-                if j > 0:
+                if j > 0 or i == 0:
                     axarr[i, j].set_yticks([])
                 if i > j:
                     axarr[i, j].set_ylim(x_min[i], x_max[i])
@@ -164,7 +204,7 @@ for ngal in xolmis.NGAL:
     xi_cov = xolmis.read_mock_observations(ngal)[1]
 
     table = Table.read(os.path.join(
-        xolmis.BASE_DIR, 'fits', 'sham_{}'.format(ngal).replace('.', 'p') +
+        xolmis.BASE_DIR, 'fits', 'hod_{}'.format(ngal).replace('.', 'p') +
         '.hdf5'))
 
     fig, axarr = plt.subplots(figsize=(7, 3.5), ncols=3, sharex=True,
