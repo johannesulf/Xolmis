@@ -15,27 +15,16 @@ from halotools.empirical_models import AssembiasZheng07Sats
 parser = argparse.ArgumentParser()
 parser.add_argument('model', choices=['sham', 'hod'])
 parser.add_argument('ngal', type=float, choices=xolmis.NGAL)
-args = parser.parse_args()
+args = parser.parse_args(['hod', '0.0005'])
 
 # %%
 
 simulation_list = ['base_c000_ph000', 'base_c103_ph000', 'base_c109_ph000',
                    'base_c113_ph000']#, 'base_c112_ph000', 'base_c113_ph000']
 redshift = 0.2
-n_dim = 11
+n_dim = 10
 
 # %%
-
-class IncompleteAssembiasZheng07Cens(AssembiasZheng07Cens):
-
-    def __init__(self, **kwargs):
-        AssembiasZheng07Cens.__init__(self, **kwargs)
-        self.param_dict['f_compl'] = 1.0
-
-    def mean_occupation(self, **kwargs):
-        return (AssembiasZheng07Cens.mean_occupation(self, **kwargs) *
-                self.param_dict['f_compl'])
-
 
 def prediction(theta):
     model.param_dict['logMmin'] = 11.0 + theta[0] * 4
@@ -43,14 +32,13 @@ def prediction(theta):
     model.param_dict['alpha'] = theta[2] * 2
     model.param_dict['logM0'] = 11.0 + theta[3] * 4
     model.param_dict['logM1'] = 11.0 + theta[4] * 4
-    model.param_dict['f_compl'] = 0.01 + theta[5] * 0.99
     model.param_dict['mean_occupation_centrals_assembias_param1'] = (
-        theta[6] * 2 - 1)
+        theta[5] * 2 - 1)
     model.param_dict['mean_occupation_satellites_assembias_param1'] = (
-        theta[7] * 2 - 1)
-    model.param_dict['alpha_s'] = 0.8 + 0.4 * theta[8]
-    model.param_dict['alpha_c'] = 0.4 * theta[9]
-    model.param_dict['log_eta'] = -np.log(3) + theta[10] * 2 * np.log(3)
+        theta[6] * 2 - 1)
+    model.param_dict['alpha_s'] = 0.8 + 0.4 * theta[7]
+    model.param_dict['alpha_c'] = 0.4 * theta[8]
+    model.param_dict['log_eta'] = -np.log(3) + theta[9] * 2 * np.log(3)
     n, xi0 = halotab['xi0'].predict(model, same_halos=True, extrapolate=True)
     n, xi2 = halotab['xi2'].predict(model, same_halos=True, extrapolate=True)
     n, xi4 = halotab['xi4'].predict(model, same_halos=True, extrapolate=True)
@@ -108,7 +96,7 @@ for i in range(len(table)):
 
     prim_haloprop_key = halotab['xi0'].tabcorr_list[0].attrs[
         'prim_haloprop_key']
-    cens_occ_model = IncompleteAssembiasZheng07Cens(
+    cens_occ_model = AssembiasZheng07Cens(
         prim_haloprop_key=prim_haloprop_key,
         sec_haloprop_key='halo_nfw_conc')
     sats_occ_model = AssembiasZheng07Sats(
@@ -139,3 +127,5 @@ for i in range(len(table)):
 
 table.write(model_obs + '_{}'.format(args.ngal).replace('.', 'p') + '.hdf5',
             path='data', overwrite=True)
+
+# %%
